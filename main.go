@@ -109,30 +109,37 @@ type PageData struct {
 	ErrorMessage string
 }
 
+func isExist(env_name string) bool {
+	_, isExists := os.LookupEnv("APP_API_KEY")
+	return isExists
+}
+
+func writeApiError(w http.ResponseWriter) {
+	w.WriteHeader(500)
+	_, _ = w.Write([]byte("Got an error while processing request to api.duma.gov.ru"))
+}
+
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+	if !isExist("APP_API_KEY") || !isExist("PERSONAL_API_KEY") {
+		log.Fatal("APP_API_KEY or PERSONAL_API_KEY are not set")
+	}
 	appKey := os.Getenv("APP_API_KEY")
 	pesonalKey := os.Getenv("PERSONAL_API_KEY")
 	var laws []dumastructs.Law
 	var factions []dumastructs.Faction
 	var errMsg string
 
-	if appKey != "" {
-		voteId := 80988
-		realLaws, realFactions, err := parse.FetchVoteInfo(appKey, pesonalKey, voteId)
-		if err != nil {
-			log.Printf("Ошибка API: %v. Переключаюсь на демо-данные.", err)
-			errMsg = err.Error()
-			// Фоллбэк на демо-данные, чтобы сайт не падал полностью
-			laws, factions = getMockData()
-		} else {
-			laws = realLaws
-			factions = realFactions
-		}
-	} else {
-		errMsg = "Переменная окружения DUMA_API_KEY не установлена."
-		laws, factions = getMockData()
+	voteId := 80988
+	realLaws, realFactions, err := parse.FetchVoteInfo(appKey, pesonalKey, voteId)
+	if err != nil {
+		log.Printf("API error: %v.", err)
+		errMsg = err.Error()
+		// Reply user with error
+		writeApiError(w)
+		return
 	}
-
+	laws = realLaws
+	factions = realFactions
 	directions := parse.CalculateFactionDirections(laws, factions)
 
 	data := PageData{
@@ -172,6 +179,11 @@ func main() {
 	http.HandleFunc("/", mainHandler)
 	port := ":8080"
 	log.Printf("Started server on http://localhost%s", port)
-	_, isExists := os.LookupEnv("DUMA_API_KEY")
+	if !isExist("APP_API_KEY") {
+		log.Fatal("App api key is not set. APP_API_KEY env is empty")
+	}
+	if !isExist("PERSONAL_API_KEY") {
+		log.Fatal("App api key is not set. PERSONAL_API_KEY env is empty")
+	}
 	log.Fatal(http.ListenAndServe(port, nil))
 }

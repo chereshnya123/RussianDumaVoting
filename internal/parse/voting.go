@@ -30,18 +30,9 @@ func FetchVoteInfo(appKey, personalKey string, voteId int) ([]dumastructs.Law, [
 		return nil, nil, err
 	}
 
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	req.Header.Set("Accept-Language", "ru-RU,ru;q=0.9,en;q=0.8")
-	req.Header.Set("Cache-Control", "max-age=0")
-	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Cookie", "symfony=ssqkfsohai78j66e03eag3a3g6")
-	req.Header.Set("Dnt", "1")
-	req.Header.Set("Host", "api.duma.gov.ru")
-	req.Header.Set("Upgrade-Insecure-Requests", "1")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.4.0.0 Safari/537.36")
 
-	client := &http.Client{Timeout: 30 * time.Minute}
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, nil, fmt.Errorf("ошибка запроса к API: %w", err)
@@ -72,7 +63,7 @@ func FetchVoteInfo(appKey, personalKey string, voteId int) ([]dumastructs.Law, [
 		}
 
 		law := dumastructs.Law{
-			ID:          rv.ID,
+			ID:          rv.Code,
 			Title:       rv.Title,
 			Description: "Голосование по вопросу", // В расширенной версии можно подтянуть из /api/bill/{id}
 			Votes:       factionVotes,
