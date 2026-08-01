@@ -1,3 +1,4 @@
+// Package main is the entry point for the dumaVote application.
 package main
 
 import (
@@ -10,44 +11,43 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 )
 
-func isExist(env_name string) bool {
-	_, isExists := os.LookupEnv(env_name)
-	return isExists
-}
+// envNames lists required environment variables.
+var envNames = []string{"APP_API_KEY", "PERSONAL_API_KEY"}
 
 func checkEnv() {
-	if !isExist("APP_API_KEY") {
-		log.Fatal("App api key is not set. APP_API_KEY env is empty")
-	}
-	if !isExist("PERSONAL_API_KEY") {
-		log.Fatal("Personal api key is not set. PERSONAL_API_KEY env is empty")
+	for _, name := range envNames {
+		if os.Getenv(name) == "" {
+			log.Fatalf("Required environment variable %s is not set", name)
+		}
 	}
 }
 
-// CustomHandler implements Handler for slog.Logger
-type CustomHandler struct {
+// StdoutHandler is a custom slog.Handler that writes structured logs to stdout.
+type StdoutHandler struct {
 	opts *slog.HandlerOptions
 	mu   sync.Mutex
 	out  io.Writer
 }
 
-func NewCustomHandler(w io.Writer, opts *slog.HandlerOptions) *CustomHandler {
+// NewStdoutHandler creates a new StdoutHandler.
+func NewStdoutHandler(w io.Writer, opts *slog.HandlerOptions) *StdoutHandler {
 	if opts == nil {
 		opts = &slog.HandlerOptions{}
 	}
-	return &CustomHandler{
-		opts: opts,
-		out:  w,
-	}
+	return &StdoutHandler{opts: opts, out: w}
 }
 
-func (h *CustomHandler) Enabled(_ context.Context, level slog.Level) bool {
+// Enabled reports whether the handler handles records at the given level.
+func (h *StdoutHandler) Enabled(_ context.Context, level slog.Level) bool {
 	minLevel := slog.LevelInfo
 	if h.opts.Level != nil {
 		minLevel = h.opts.Level.Level()
@@ -55,29 +55,29 @@ func (h *CustomHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= minLevel
 }
 
-func (h *CustomHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+// WithAttrs returns a new Handler with the given attributes added.
+func (h *StdoutHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	// Simplified: attributes are appended in Handle.
 	return h
 }
 
-func (h *CustomHandler) WithGroup(name string) slog.Handler {
+// WithGroup returns a new Handler with the given group prepended to future group names.
+func (h *StdoutHandler) WithGroup(name string) slog.Handler {
+	// Simplified: group is ignored.
 	return h
 }
 
-func (h *CustomHandler) Handle(_ context.Context, r slog.Record) error {
+// Handle processes a log record.
+func (h *StdoutHandler) Handle(_ context.Context, r slog.Record) error {
 	buf := &bytes.Buffer{}
 
-	// Time format: 2026-08-02 15:30:45
 	timeStr := r.Time.Format("2006-01-02 15:04:05")
-
-	// Log level in upper case
 	levelStr := strings.ToUpper(r.Level.String())
 
-	// Get info about file and line num
 	var sourceStr string
 	if r.PC != 0 {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		f, _ := fs.Next()
-		// Get filename from path
 		fileName := filepath.Base(f.File)
 		sourceStr = fmt.Sprintf("%s:%d", fileName, f.Line)
 	}
@@ -93,29 +93,60 @@ func (h *CustomHandler) Handle(_ context.Context, r slog.Record) error {
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
 	_, err := h.out.Write(buf.Bytes())
 	return err
 }
 
 func main() {
 	checkEnv()
-	handler := NewCustomHandler(os.Stdout, &slog.HandlerOptions{
+
+	handler := NewStdoutHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: true,
 	})
-
 	logger := slog.New(handler)
 
 	port := "8080"
 
-	dumaVotesServer := server.NewDumaVotesServer(os.Getenv("APP_API_KEY"), os.Getenv("PERSONAL_API_KEY"), logger)
-	server := &http.Server{
+	srv := server.NewDumaVotesServer(
+		os.Getenv("APP_API_KEY"),
+		os.Getenv("PERSONAL_API_KEY"),
+		logger,
+	)
+
+	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
-		Handler: http.HandlerFunc(dumaVotesServer.MainHandler),
+		Handler: http.HandlerFunc(srv.MainHandler),
 	}
+
+	// Graceful shutdown on SIGINT/SIGTERM.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
 	logger.Info(fmt.Sprintf("Start server on http://localhost:%s", port))
-	err := server.ListenAndServe()
-	if err != nil {
-		logger.Info("Http serve shut down.", "Error", err.Error())
+
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("HTTP server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-quit
+
+	logger.Info("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		logger.Error("Server forced to shutdown", "error", err)
 	}
+
+	if err := srv.Close(); err != nil {
+		logger.Error("Database close error", "error", err)
+	}
+
+	logger.Info("Server exited")
 }

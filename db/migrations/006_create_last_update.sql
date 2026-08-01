@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS metadata (
-  id INT PRIMARY KEY,
-  last_update DATETIME NOT NULL -- last update time
+CREATE TABLE IF NOT EXISTS sync_status (
+  id INTEGER PRIMARY KEY,
+  last_successful_update DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

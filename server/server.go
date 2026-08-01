@@ -1,23 +1,15 @@
+// Package server provides the HTTP server for the dumaVote application.
 package server
 
 import (
 	"dumaVote/db"
 	"dumaVote/dumaclient"
-	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
-
-	_ "github.com/mattn/go-sqlite3"
 )
-
-type dumaVotesServer struct {
-	apiDumaClient dumaclient.DumaVoteClient
-	db            *db.Database
-	logger        *slog.Logger
-}
 
 const htmlTemplate = `
 <!DOCTYPE html>
@@ -36,7 +28,7 @@ const htmlTemplate = `
 </head>
 <body>
     <div class="container">
-        <h1>📋 Повестка дня</h1>
+        <h1>Повестка дня</h1>
         {{range .}}
         <div class="card">
             <div class="header">
@@ -53,45 +45,51 @@ const htmlTemplate = `
 </body>
 </html>`
 
-var funcMap = template.FuncMap{
+var htmlTmpl = template.Must(template.New("webpage").Funcs(template.FuncMap{
 	"joinTags": func(tags []string) string {
 		return strings.Join(tags, ", ")
 	},
+}).Parse(htmlTemplate))
+
+// DumaVotesServer is the HTTP server handler.
+type DumaVotesServer struct {
+	apiDumaClient dumaclient.DumaVoteClient
+	db            *db.Database
+	logger        *slog.Logger
 }
 
-func NewDumaVotesServer(apiKey, personalKey string, logger *slog.Logger) dumaVotesServer {
+// NewDumaVotesServer creates a new server instance with database and API client.
+func NewDumaVotesServer(apiKey, personalKey string, logger *slog.Logger) *DumaVotesServer {
 	db, err := db.NewDatabase("RussianDumaVote")
 	if err != nil {
-		logger.Error(fmt.Sprintf("Can not create duma database. Error = %v", err))
-		panic(err.Error())
+		logger.Error("Failed to create database", "error", err)
+		panic(err)
 	}
 
-	return dumaVotesServer{apiDumaClient: dumaclient.NewDumaVoteClient(logger), db: db, logger: logger}
+	return &DumaVotesServer{
+		apiDumaClient: dumaclient.NewDumaVoteClient(logger),
+		db:            db,
+		logger:        logger,
+	}
 }
 
-func (d *dumaVotesServer) MainHandler(w http.ResponseWriter, r *http.Request) {
-	question, err := d.apiDumaClient.GetLastMeetingQuestion()
+// MainHandler is the HTTP handler for the main page.
+func (s *DumaVotesServer) MainHandler(w http.ResponseWriter, r *http.Request) {
+	question, err := s.apiDumaClient.GetLastMeetingQuestion()
 	if err != nil {
-		d.logger.Error(fmt.Sprintf("API error: %v.", err))
-		// Reply user with error
+		s.logger.Error("API error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	tmpl, err := template.New("webpage").Funcs(funcMap).Parse(htmlTemplate)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = tmpl.Execute(w, []dumaclient.Question{question})
-	if err != nil {
-		d.logger.Error(err.Error())
+	if err := htmlTmpl.Execute(w, []dumaclient.Question{question}); err != nil {
+		s.logger.Error("Template execution failed", "error", err)
 	}
 }
 
-func (d *dumaVotesServer) shouldUpdate() (bool, error) {
-	lastUpdate, err := d.db.GetLastUpdateTime()
+// ShouldUpdate checks if a data refresh is needed based on the last update time.
+func (s *DumaVotesServer) ShouldUpdate() (bool, error) {
+	lastUpdate, err := s.db.GetLastUpdateTime()
 	if err != nil {
 		return false, err
 	}
@@ -100,16 +98,20 @@ func (d *dumaVotesServer) shouldUpdate() (bool, error) {
 		return true, nil
 	}
 
-	elapsed := time.Since(lastUpdate)
-
-	return elapsed > time.Hour, nil
+	return time.Since(lastUpdate) > time.Hour, nil
 }
 
-func (d *dumaVotesServer) UpdateDataBase() error {
-	update, err := d.shouldUpdate()
+// UpdateData refreshes the data if enough time has elapsed.
+func (s *DumaVotesServer) UpdateData() error {
+	update, err := s.ShouldUpdate()
 	if err != nil || !update {
 		return err
 	}
 
 	return nil
+}
+
+// Close closes the underlying database connection.
+func (s *DumaVotesServer) Close() error {
+	return s.db.Close()
 }

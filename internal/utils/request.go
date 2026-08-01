@@ -8,16 +8,27 @@ import (
 	"time"
 )
 
-func DoSimpleRequest(apiUrl string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", apiUrl, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.4.0.0 Safari/537.36")
+// DefaultTimeout is the default HTTP client timeout.
+const DefaultTimeout = 30 * time.Second
+
+// DoSimpleRequest performs a GET request with a user-agent header and returns the response.
+func DoSimpleRequest(apiURL string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{Timeout: 15 * time.Minute}
+	req.Header.Set(
+		"User-Agent",
+		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.4.0.0 Safari/537.36",
+	)
+
+	client := &http.Client{Timeout: DefaultTimeout}
 	resp, err := client.Do(req)
-	if err != nil && !errors.Is(err, io.EOF) {
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil //nolint:nilerr // nil response treated as empty
+		}
 		return nil, fmt.Errorf("API request error: %w", err)
 	}
 

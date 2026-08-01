@@ -1,3 +1,4 @@
+// Package dumaclient provides a client for the Gosduma API.
 package dumaclient
 
 import (
@@ -11,16 +12,17 @@ import (
 	"time"
 )
 
-// Separate meeting issue
+// Question represents a single meeting issue from the Gosduma API.
 type Question struct {
 	Name    string `json:"name"`    // Question name
 	Datez   string `json:"datez"`   // Meeting date
 	Kodz    int    `json:"kodz"`    // Meeting code
-	Kodvopr int    `json:"kodvopr"` // Sequence number of issue
-	Nbegin  int    `json:"nbegin"`  // First issue num
-	Nend    int    `json:"nend"`    // Second issue num
+	Kodvopr int    `json:"kodvopr"` // Issue sequence number
+	Nbegin  int    `json:"nbegin"`  // First page of transcript
+	Nend    int    `json:"nend"`    // Last page of transcript
 }
 
+// QuestionResponse is the response structure for the questions API endpoint.
 type QuestionResponse struct {
 	PageSize   int        `json:"pageSize"`
 	Page       int        `json:"page"`
@@ -28,53 +30,61 @@ type QuestionResponse struct {
 	Questions  []Question `json:"questions"`
 }
 
+// DumaVoteClient interacts with the Gosduma API.
 type DumaVoteClient struct {
 	appApiKey      string
 	personalApiKey string
 	logger         *slog.Logger
 }
 
+// NewDumaVoteClient creates a new client using environment variables for authentication.
 func NewDumaVoteClient(logger *slog.Logger) DumaVoteClient {
-	appApiKey := os.Getenv("APP_API_KEY")
-	personalApiKey := os.Getenv("PERSONAL_API_KEY")
-	return DumaVoteClient{appApiKey: appApiKey, personalApiKey: personalApiKey, logger: logger}
+	return DumaVoteClient{
+		appApiKey:      os.Getenv("APP_API_KEY"),
+		personalApiKey: os.Getenv("PERSONAL_API_KEY"),
+		logger:         logger,
+	}
 }
 
-func (d DumaVoteClient) GetLastMeetingQuestion() (Question, error) {
+// GetLastMeetingQuestion fetches the most recent meeting question from the API.
+func (c DumaVoteClient) GetLastMeetingQuestion() (Question, error) {
 	now := time.Now()
-	apiURL := fmt.Sprintf("http://api.duma.gov.ru/api/%s/questions.json?app_token=%s&limit=5&dateTo=%s", d.personalApiKey, d.appApiKey, now.Format("2006-01-02"))
-	d.logger.Info(fmt.Sprintf("Calling: %s", apiURL))
+	apiURL := fmt.Sprintf(
+		"http://api.duma.gov.ru/api/%s/questions.json?app_token=%s&limit=5&dateTo=%s",
+		c.personalApiKey, c.appApiKey, now.Format("2006-01-02"),
+	)
+
+	c.logger.Info("Calling Gosduma API", "host", "api.duma.gov.ru")
+
 	resp, err := utils.DoSimpleRequest(apiURL)
 	if err != nil {
-		d.logger.Error(fmt.Sprintf("Get an error while request. Error = %v", err.Error()))
-		return Question{}, fmt.Errorf("get an error while request. Error = %v", err.Error())
+		return Question{}, fmt.Errorf("get request failed: %w", err)
 	}
 
 	if resp == nil {
-		d.logger.Warn("Get null response")
+		c.logger.Warn("Received nil response")
 		return Question{}, nil
-	}
-	bodyBytes, err := io.ReadAll(resp.Body)
-
-	if err != nil {
-		d.logger.Error(fmt.Sprintf("Can not read body from /questions response. Err = %v", err))
-		return Question{}, fmt.Errorf("can not read body from /questions response. Err = %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	var response QuestionResponse
-	err = json.Unmarshal([]byte(bodyBytes), &response)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		d.logger.Error(fmt.Sprintf("Can not parse JSON from /questions.json. Err = %v", err))
-		return Question{}, err
+		c.logger.Error("Failed to read response body", "error", err)
+		return Question{}, fmt.Errorf("read response body: %w", err)
 	}
 
-	sort.Slice(response.Questions, func(i, j int) (less bool) {
+	var response QuestionResponse
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
+		c.logger.Error("Failed to parse JSON response", "error", err)
+		return Question{}, fmt.Errorf("parse JSON: %w", err)
+	}
+
+	sort.Slice(response.Questions, func(i, j int) bool {
 		return response.Questions[i].Datez > response.Questions[j].Datez
 	})
 
 	if len(response.Questions) == 0 {
-		d.logger.Warn("Empty response")
+		c.logger.Warn("Empty questions list")
 		return Question{}, nil
 	}
 

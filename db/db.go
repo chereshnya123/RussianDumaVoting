@@ -10,9 +10,10 @@ import (
 	"sort"
 	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
+// Database provides access to the SQLite database.
 type Database struct {
 	db *sql.DB
 }
@@ -20,6 +21,7 @@ type Database struct {
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
+// NewDatabase opens the SQLite database and applies migrations.
 func NewDatabase(dbPath string) (*Database, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -29,16 +31,18 @@ func NewDatabase(dbPath string) (*Database, error) {
 	database := &Database{db: db}
 
 	if err := database.ApplyMigrations(); err != nil {
-		return nil, fmt.Errorf("failed to create tables: %w", err)
+		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
 	return database, nil
 }
 
+// Close closes the database connection.
 func (d *Database) Close() error {
 	return d.db.Close()
 }
 
+// ApplyMigrations applies all SQL migration files in the embedded migrations directory.
 func (d *Database) ApplyMigrations() error {
 	entries, err := fs.Glob(migrationFiles, "migrations/*.sql")
 	if err != nil {
@@ -56,8 +60,7 @@ func (d *Database) ApplyMigrations() error {
 			return fmt.Errorf("failed to read %s: %w", filename, err)
 		}
 
-		_, err = d.db.Exec(string(content))
-		if err != nil {
+		if _, err := d.db.Exec(string(content)); err != nil {
 			return fmt.Errorf("failed to execute %s: %w", filename, err)
 		}
 	}
@@ -66,14 +69,11 @@ func (d *Database) ApplyMigrations() error {
 	return nil
 }
 
+// GetLastUpdateTime returns the last successful update time.
 func (d *Database) GetLastUpdateTime() (time.Time, error) {
 	var lastUpdate time.Time
-
-	err := d.db.QueryRow("SELECT MAX(last_successful_update) FROM sync_status").Scan(&lastUpdate)
-
-	if err != nil {
-		return time.Time{}, err
+	if err := d.db.QueryRow("SELECT MAX(last_successful_update) FROM sync_status").Scan(&lastUpdate); err != nil {
+		return time.Time{}, fmt.Errorf("failed to get last update time: %w", err)
 	}
-
 	return lastUpdate, nil
 }
