@@ -1,12 +1,11 @@
 package dumaclient
 
 import (
-	"dumaVote/db"
 	"dumaVote/internal/utils"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"sort"
 	"time"
@@ -32,33 +31,33 @@ type QuestionResponse struct {
 type DumaVoteClient struct {
 	appApiKey      string
 	personalApiKey string
-	database       *db.Database
+	logger         *slog.Logger
 }
 
-func NewDumaVoteClient() DumaVoteClient {
+func NewDumaVoteClient(logger *slog.Logger) DumaVoteClient {
 	appApiKey := os.Getenv("APP_API_KEY")
 	personalApiKey := os.Getenv("PERSONAL_API_KEY")
-	return DumaVoteClient{appApiKey: appApiKey, personalApiKey: personalApiKey}
+	return DumaVoteClient{appApiKey: appApiKey, personalApiKey: personalApiKey, logger: logger}
 }
 
 func (d DumaVoteClient) GetLastMeetingQuestion() (Question, error) {
 	now := time.Now()
 	apiURL := fmt.Sprintf("http://api.duma.gov.ru/api/%s/questions.json?app_token=%s&limit=5&dateTo=%s", d.personalApiKey, d.appApiKey, now.Format("2006-01-02"))
-	log.Printf("Calling: %s\n", apiURL)
+	d.logger.Info(fmt.Sprintf("Calling: %s\n", apiURL))
 	resp, err := utils.DoSimpleRequest(apiURL)
 	if err != nil {
-		log.Printf("Get an error while request. Error = %v", err.Error())
+		d.logger.Error(fmt.Sprintf("Get an error while request. Error = %v", err.Error()))
 		return Question{}, fmt.Errorf("get an error while request. Error = %v", err.Error())
 	}
 
 	if resp == nil {
-		log.Printf("Get null response")
+		d.logger.Warn("Get null response")
 		return Question{}, nil
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		log.Printf("Can not read body from /questions response. Err = %v", err)
+		d.logger.Error(fmt.Sprintf("Can not read body from /questions response. Err = %v", err))
 		return Question{}, fmt.Errorf("can not read body from /questions response. Err = %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -66,7 +65,7 @@ func (d DumaVoteClient) GetLastMeetingQuestion() (Question, error) {
 	var response QuestionResponse
 	err = json.Unmarshal([]byte(bodyBytes), &response)
 	if err != nil {
-		log.Printf("Can not parse JSON from /questions.json. Err = %v", err)
+		d.logger.Error(fmt.Sprintf("Can not parse JSON from /questions.json. Err = %v", err))
 		return Question{}, err
 	}
 
@@ -75,7 +74,7 @@ func (d DumaVoteClient) GetLastMeetingQuestion() (Question, error) {
 	})
 
 	if len(response.Questions) == 0 {
-		log.Printf("Empty response")
+		d.logger.Warn("Empty response")
 		return Question{}, nil
 	}
 

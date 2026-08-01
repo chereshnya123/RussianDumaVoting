@@ -3,8 +3,9 @@ package server
 import (
 	"dumaVote/db"
 	"dumaVote/dumaclient"
+	"fmt"
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 type dumaVotesServer struct {
 	apiDumaClient dumaclient.DumaVoteClient
 	db            *db.Database
+	logger        *slog.Logger
 }
 
 const htmlTemplate = `
@@ -56,23 +58,25 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func NewDumaVotesServer(apiKey, personalKey string) dumaVotesServer {
+func NewDumaVotesServer(apiKey, personalKey string, logger *slog.Logger) dumaVotesServer {
 	db, err := db.NewDatabase("RussianDumaVotes")
 	if err != nil {
-		log.Fatalf("Can not create duma database. Error = %v", err)
+		logger.Error(fmt.Sprintf("Can not create duma database. Error = %v", err))
+		panic(err.Error())
 	}
 
-	return dumaVotesServer{apiDumaClient: dumaclient.NewDumaVoteClient(), db: db}
+	return dumaVotesServer{apiDumaClient: dumaclient.NewDumaVoteClient(logger), db: db, logger: logger}
 }
 
 func (d *dumaVotesServer) MainHandler(w http.ResponseWriter, r *http.Request) {
 	question, err := d.apiDumaClient.GetLastMeetingQuestion()
 	if err != nil {
-		log.Printf("API error: %v.", err)
+		d.logger.Error(fmt.Sprintf("API error: %v.", err))
 		// Reply user with error
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	tmpl, err := template.New("webpage").Funcs(funcMap).Parse(htmlTemplate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -81,6 +85,6 @@ func (d *dumaVotesServer) MainHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = tmpl.Execute(w, []dumaclient.Question{question})
 	if err != nil {
-		log.Print(err.Error())
+		d.logger.Error(err.Error())
 	}
 }
