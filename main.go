@@ -30,7 +30,7 @@ func checkEnv() {
 	}
 }
 
-// CustomHandler реализует интерфейс slog.Handler с кастомным форматом
+// CustomHandler implements Handler for slog.Logger
 type CustomHandler struct {
 	opts *slog.HandlerOptions
 	mu   sync.Mutex
@@ -56,8 +56,6 @@ func (h *CustomHandler) Enabled(_ context.Context, level slog.Level) bool {
 }
 
 func (h *CustomHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	// Для простоты игнорируем дополнительные атрибуты
-	// В production можно хранить их и выводить
 	return h
 }
 
@@ -68,26 +66,24 @@ func (h *CustomHandler) WithGroup(name string) slog.Handler {
 func (h *CustomHandler) Handle(_ context.Context, r slog.Record) error {
 	buf := &bytes.Buffer{}
 
-	// Формат времени: 2026-08-02 15:30:45
+	// Time format: 2026-08-02 15:30:45
 	timeStr := r.Time.Format("2006-01-02 15:04:05")
 
-	// Уровень логирования в верхнем регистре
+	// Log level in upper case
 	levelStr := strings.ToUpper(r.Level.String())
 
-	// Получаем информацию о файле и строке
+	// Get info about file and line num
 	var sourceStr string
 	if r.PC != 0 {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		f, _ := fs.Next()
-		// Только имя файла без пути
+		// Get filename from path
 		fileName := filepath.Base(f.File)
 		sourceStr = fmt.Sprintf("%s:%d", fileName, f.Line)
 	}
 
-	// Формируем сообщение: [Время][файл:строка] Сообщение
 	fmt.Fprintf(buf, "[%s][%s][%s] %s", timeStr, levelStr, sourceStr, r.Message)
 
-	// Добавляем атрибуты если есть
 	r.Attrs(func(a slog.Attr) bool {
 		fmt.Fprintf(buf, " %s=%v", a.Key, a.Value.Any())
 		return true

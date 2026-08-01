@@ -1,6 +1,5 @@
 package dumastructs
 
-// Структура соответствует открытым данным vote.duma.gov.ru и API АСОЗД
 type Deputy struct {
 	ID      string      `json:"id"`
 	Name    string      `json:"name"`
@@ -9,12 +8,12 @@ type Deputy struct {
 
 type FactionInfo struct {
 	ID    string `json:"id"`
-	Title string `json:"title"` // Например: "Единая Россия", "КПРФ"
+	Title string `json:"title"` // For example: "United Russia", "KPRF"
 }
 
 type VoteRecord struct {
 	Deputy Deputy `json:"deputy"`
-	Result string `json:"result"` // "accept", "declice" (опечатка в API Госдумы означает decline), "abstain", "none"
+	Result string `json:"result"` // "accept", "declice" (Typo in Gosduma API: decline), "abstain", "none"
 }
 
 type DumaVote struct {
@@ -24,7 +23,6 @@ type DumaVote struct {
 	Votes    []VoteRecord `json:"votes"`
 }
 
-// Наши внутренние структуры для отображения
 type VoteResult struct {
 	For       int
 	Against   int
@@ -37,7 +35,7 @@ type Law struct {
 	Title       string
 	Description string
 	Tags        []string
-	Votes       map[string]VoteResult // Ключ - название фракции
+	Votes       map[string]VoteResult
 }
 
 type Faction struct {
