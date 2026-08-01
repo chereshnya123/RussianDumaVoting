@@ -9,7 +9,7 @@ import (
 )
 
 func isExist(env_name string) bool {
-	_, isExists := os.LookupEnv("APP_API_KEY")
+	_, isExists := os.LookupEnv(env_name)
 	return isExists
 }
 
