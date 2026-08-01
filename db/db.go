@@ -20,7 +20,7 @@ type Database struct {
 var migrationFiles embed.FS
 
 func NewDatabase(dbPath string) (*Database, error) {
-	db, err := sql.Open("postgres", dbPath)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}

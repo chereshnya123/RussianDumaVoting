@@ -3,5 +3,5 @@ CREATE TABLE IF NOT EXISTS departments (
   head INT NOT NULL, -- Id of deputy
   name TEXT -- name of department
   size INT -- count of deputies in department
-  members TEXT -- json array of deputies ID
+  members JSONB -- json array of deputies ID
 );  

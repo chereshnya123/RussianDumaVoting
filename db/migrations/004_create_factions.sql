@@ -3,6 +3,6 @@ CREATE TABLE IF NOT EXISTS factions (
   name TEXT -- name of faction
   head INT -- Id of deputy
   department INT -- id of departments
-  target_questions TEXT -- json array of target questions
-  target_tags TEXT -- json map {tag -> count of target laws}
+  target_questions JSONB -- json array of target questions
+  target_tags JSONB -- json map {tag -> count of target laws}
 );  

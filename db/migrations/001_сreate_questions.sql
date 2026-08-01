@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS questions (
   id INT PRIMARY KEY, -- (example: 1208563-8)
   name TEXT NOT NULL, -- Header
-  tags TEXT -- JSON array of tags
+  tags JSONB -- JSON array of tags
   vote_id INT -- Id of voting
-  departments TEXT -- json array of departments ids
-  authors TEXT -- json array of deputies ID
+  departments JSONB -- json array of departments ids
+  authors JSONB -- json array of deputies ID
 );  
