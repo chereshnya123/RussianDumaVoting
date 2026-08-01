@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS factions (
-  id TEXT PRIMARY KEY,
+  id INT PRIMARY KEY,
   name TEXT -- name of faction
   head INT -- Id of deputy
   department INT -- id of departments

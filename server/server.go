@@ -1,7 +1,7 @@
 package server
 
 import (
-	"dumaVote/db"
+	"database/sql"
 	"dumaVote/dumaclient"
 	"fmt"
 	"html/template"
@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 type dumaVotesServer struct {
 	apiDumaClient dumaclient.DumaVoteClient
-	db            *db.Database
+	db            *sql.DB
 	logger        *slog.Logger
 }
 
@@ -59,7 +59,7 @@ var funcMap = template.FuncMap{
 }
 
 func NewDumaVotesServer(apiKey, personalKey string, logger *slog.Logger) dumaVotesServer {
-	db, err := db.NewDatabase("RussianDumaVotes")
+	db, err := sql.Open("postgres", "user=username password=password host=localhost dbname=RussianDumaVOte sslmode=disable")
 	if err != nil {
 		logger.Error(fmt.Sprintf("Can not create duma database. Error = %v", err))
 		panic(err.Error())

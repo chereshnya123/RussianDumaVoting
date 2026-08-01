@@ -43,7 +43,7 @@ func NewDumaVoteClient(logger *slog.Logger) DumaVoteClient {
 func (d DumaVoteClient) GetLastMeetingQuestion() (Question, error) {
 	now := time.Now()
 	apiURL := fmt.Sprintf("http://api.duma.gov.ru/api/%s/questions.json?app_token=%s&limit=5&dateTo=%s", d.personalApiKey, d.appApiKey, now.Format("2006-01-02"))
-	d.logger.Info(fmt.Sprintf("Calling: %s\n", apiURL))
+	d.logger.Info(fmt.Sprintf("Calling: %s", apiURL))
 	resp, err := utils.DoSimpleRequest(apiURL)
 	if err != nil {
 		d.logger.Error(fmt.Sprintf("Get an error while request. Error = %v", err.Error()))
