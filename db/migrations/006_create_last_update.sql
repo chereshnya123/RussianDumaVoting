@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS vote (
+CREATE TABLE IF NOT EXISTS metadata (
   id INT PRIMARY KEY,
-  last_update date -- date of update
-);  
+  last_update DATETIME NOT NULL -- last update time
+);

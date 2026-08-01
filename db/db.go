@@ -8,6 +8,7 @@ import (
 	"log"
 	"path/filepath"
 	"sort"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -63,4 +64,16 @@ func (d *Database) ApplyMigrations() error {
 
 	log.Println("All migrations applied successfully")
 	return nil
+}
+
+func (d *Database) GetLastUpdateTime() (time.Time, error) {
+	var lastUpdate time.Time
+
+	err := d.db.QueryRow("SELECT MAX(last_successful_update) FROM sync_status").Scan(&lastUpdate)
+
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return lastUpdate, nil
 }

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -87,4 +88,28 @@ func (d *dumaVotesServer) MainHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		d.logger.Error(err.Error())
 	}
+}
+
+func (d *dumaVotesServer) shouldUpdate() (bool, error) {
+	lastUpdate, err := d.db.GetLastUpdateTime()
+	if err != nil {
+		return false, err
+	}
+
+	if lastUpdate.IsZero() {
+		return true, nil
+	}
+
+	elapsed := time.Since(lastUpdate)
+
+	return elapsed > time.Hour, nil
+}
+
+func (d *dumaVotesServer) UpdateDataBase() error {
+	update, err := d.shouldUpdate()
+	if err != nil || !update {
+		return err
+	}
+
+	return nil
 }
