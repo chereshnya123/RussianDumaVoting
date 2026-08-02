@@ -11,13 +11,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
-	"time"
 )
 
 // envNames lists required environment variables.
@@ -120,33 +117,12 @@ func main() {
 		Handler: http.HandlerFunc(srv.MainHandler),
 	}
 
-	// Graceful shutdown on SIGINT/SIGTERM.
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
 	logger.Info(fmt.Sprintf("Start server on http://localhost:%s", port))
 
-	go func() {
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("HTTP server error", "error", err)
-			os.Exit(1)
-		}
-	}()
-
-	<-quit
+	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		logger.Error("HTTP server error", "error", err)
+		os.Exit(1)
+	}
 
 	logger.Info("Shutting down server...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := httpServer.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", "error", err)
-	}
-
-	if err := srv.Close(); err != nil {
-		logger.Error("Database close error", "error", err)
-	}
-
-	logger.Info("Server exited")
 }

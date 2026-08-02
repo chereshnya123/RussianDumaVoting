@@ -2,13 +2,15 @@
 package server
 
 import (
+	"dumaVote/analyzer"
 	"dumaVote/db"
 	"dumaVote/dumaclient"
+	"fmt"
 	"html/template"
+	"log"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 )
 
 const htmlTemplate = `
@@ -45,17 +47,18 @@ const htmlTemplate = `
 </body>
 </html>`
 
-var htmlTmpl = template.Must(template.New("webpage").Funcs(template.FuncMap{
-	"joinTags": func(tags []string) string {
-		return strings.Join(tags, ", ")
-	},
-}).Parse(htmlTemplate))
+// var htmlTmpl = template.Must(template.New("webpage").Funcs(template.FuncMap{
+// 	"joinTags": func(tags []string) string {
+// 		return strings.Join(tags, ", ")
+// 	},
+// }).Parse(htmlTemplate))
 
 // DumaVotesServer is the HTTP server handler.
 type DumaVotesServer struct {
 	apiDumaClient dumaclient.DumaVoteClient
 	db            *db.Database
 	logger        *slog.Logger
+	analyzer      analyzer.Analyzer
 }
 
 // NewDumaVotesServer creates a new server instance with database and API client.
@@ -70,45 +73,53 @@ func NewDumaVotesServer(apiKey, personalKey string, logger *slog.Logger) *DumaVo
 		apiDumaClient: dumaclient.NewDumaVoteClient(logger),
 		db:            db,
 		logger:        logger,
+		analyzer:      *analyzer.NewAnalyzer(apiKey, personalKey, db, logger),
 	}
+}
+
+var funcMap = template.FuncMap{
+	"joinTags": func(tags []string) string {
+		return strings.Join(tags, ", ")
+	},
 }
 
 // MainHandler is the HTTP handler for the main page.
 func (s *DumaVotesServer) MainHandler(w http.ResponseWriter, r *http.Request) {
-	question, err := s.apiDumaClient.GetLastMeetingQuestion()
+	s.logger.Debug(fmt.Sprintf("Accept request. URL = %s, URI = %s, method = %s\n", r.URL, r.RequestURI, r.Method))
+	s.route(w, r)
+}
+
+func (s *DumaVotesServer) route(w http.ResponseWriter, r *http.Request) {
+	uri := r.RequestURI
+	method := r.Method
+	switch {
+	case method == http.MethodGet && uri == "/":
+		s.HandleLastMeetingQuestion(w, r)
+	default:
+		s.logger.Error("Get invalid request. URI = %s, method = %s\n", uri, method)
+		w.WriteHeader(404)
+	}
+}
+
+func (s *DumaVotesServer) HandleLastMeetingQuestion(w http.ResponseWriter, r *http.Request) {
+	lastQuestion, err := s.analyzer.GetLastQuestion()
 	if err != nil {
-		s.logger.Error("API error", "error", err)
+		s.logger.Error("Can not get last question.", "Error", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	tmpl, err := template.New("webpage").Funcs(funcMap).Parse(htmlTemplate)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := htmlTmpl.Execute(w, []dumaclient.Question{question}); err != nil {
-		s.logger.Error("Template execution failed", "error", err)
-	}
-}
-
-// ShouldUpdate checks if a data refresh is needed based on the last update time.
-func (s *DumaVotesServer) ShouldUpdate() (bool, error) {
-	lastUpdate, err := s.db.GetLastUpdateTime()
+	err = tmpl.Execute(w, []db.Question{lastQuestion})
 	if err != nil {
-		return false, err
+		log.Print(err.Error())
+		s.logger.Error(err.Error())
 	}
-
-	if lastUpdate.IsZero() {
-		return true, nil
-	}
-
-	return time.Since(lastUpdate) > time.Hour, nil
-}
-
-// UpdateData refreshes the data if enough time has elapsed.
-func (s *DumaVotesServer) UpdateData() error {
-	update, err := s.ShouldUpdate()
-	if err != nil || !update {
-		return err
-	}
-
-	return nil
 }
 
 // Close closes the underlying database connection.
