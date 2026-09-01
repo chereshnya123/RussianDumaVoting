@@ -75,7 +75,7 @@ type Faction struct {
 	Id              int64  `db:"id" json:"id"`
 	Name            string `db:"name" json:"name"`
 	HeadId          int64  `db:"head" json:"head_id"`
-	DepartmentId    int64  `db:"department" json:"department_id"`
+	ApiId           int64  `db:"api_id" json:"api_id"`
 	TargetQuestions string `db:"target_questions" json:"target_questions"` // JSON array
 	TargetTags      string `db:"target_tags" json:"target_tags"`           // JSON map
 }

@@ -150,3 +150,36 @@ func (d *Database) SaveDeputyUpsert(deputy *Deputy) error {
 
 	return nil
 }
+
+func (d *Database) isFactionExists(factionApiId int64) bool {
+	query := `SELECT COUNT(*) FROM factions where api_id == ?`
+	var count int64
+	err := d.db.QueryRow(query, factionApiId).Scan(&count)
+	if err != nil && err != sql.ErrNoRows {
+		panic(fmt.Sprintf("can not check if faction exists. Faction api_id = %d, err = %s", factionApiId, err.Error()))
+	}
+
+	return count != 0
+}
+
+// SaveFaction inserts a faction into the database.
+func (d *Database) SaveFaction(faction *Faction) error {
+	if d.isFactionExists(faction.ApiId) {
+		return nil
+	}
+
+	query := `INSERT INTO factions (api_id, name, head)
+						VALUES (?, ?, ?)`
+	result, err := d.db.Exec(query, faction.ApiId, faction.Name, faction.HeadId)
+	if err != nil {
+		return fmt.Errorf("insert faction api_id=%d: %w", faction.ApiId, err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("get faction insert ID: %w", err)
+	}
+	faction.Id = id
+
+	return nil
+}

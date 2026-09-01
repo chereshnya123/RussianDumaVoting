@@ -34,12 +34,20 @@ type Vote struct {
 	Result       bool   `json:"result"`       // true — adopted, false — not adopted
 }
 
+type Faction struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+}
+
 // Deputy represents a brief deputy profile from search/list responses.
 type Deputy struct {
-	Id        string `json:"id"`        // Deputy/Federation Council member identifier
-	Name      string `json:"name"`      // Full name
-	Position  string `json:"position"`  // "Депутат ГД" or "Член СФ"
-	IsCurrent bool   `json:"isCurrent"` // true if currently holding the position
+	Id        string    `json:"id"`        // Deputy/Federation Council member identifier
+	Name      string    `json:"name"`      // Full name
+	Position  string    `json:"position"`  // "Депутат ГД" or "Член СФ"
+	IsCurrent bool      `json:"isCurrent"` // true if currently holding the position
+	Factions  []Faction `json:"factions"`  // List of factions
 }
 
 // DeputiesResponse represents the top-level Duma API response for parliament member searches.
