@@ -9,14 +9,21 @@ import (
 	"dumaVote/internal/utils"
 )
 
-const deputiesURL = "http://api.duma.gov.ru/api/%s/deputies.json?app_token=%s"
-const deputyInfoURL = "http://api.duma.gov.ru/api/%s/deputy.json?app_token=%s&id=%s"
-
 // Fetcher makes HTTP requests to the Duma API and unmarshals the response.
 type Fetcher struct {
 	appApiKey      string
 	personApiToken string
 	logger         *slog.Logger
+}
+
+func (f Fetcher) getAllDeputiesApiUrl() string {
+	const deputiesURL = "http://api.duma.gov.ru/api/%s/deputies.json?app_token=%s"
+	return fmt.Sprintf(deputiesURL, f.personApiToken, f.appApiKey)
+}
+
+func (f Fetcher) getDeputyInfoApiUrl(deputyId string) string {
+	const deputyInfoURL = "http://api.duma.gov.ru/api/%s/deputy.json?app_token=%s&id=%s"
+	return fmt.Sprintf(deputyInfoURL, f.personApiToken, f.appApiKey, deputyId)
 }
 
 // NewFetcher creates a new Fetcher.
@@ -27,7 +34,8 @@ func NewFetcher(appApiKey, personApiKey string, logger *slog.Logger) *Fetcher {
 // FetchAllDeputies fetches all deputies from the Duma API.
 // The API returns a bare JSON array [{...}], not a wrapper object.
 func (f *Fetcher) FetchAllDeputies() ([]Deputy, error) {
-	apiURL := fmt.Sprintf(deputiesURL, f.personApiToken, f.appApiKey)
+
+	apiURL := f.getAllDeputiesApiUrl()
 	f.logger.Debug("Fetch all deputy data", "url", apiURL)
 	resp, err := utils.DoSimpleRequest(apiURL)
 	if err != nil {
@@ -53,10 +61,10 @@ func (f *Fetcher) FetchAllDeputies() ([]Deputy, error) {
 
 // FetchDeputyInfo fetches detailed deputy profile from the Duma API.
 // The API returns a single JSON object { ... } with the deputy's data.
-func (f *Fetcher) FetchDeputyInfo(deputyID string) (DeputyInfo, error) {
+func (f *Fetcher) FetchDeputyInfo(deputyId string) (DeputyInfo, error) {
 	var empty DeputyInfo
 
-	apiURL := fmt.Sprintf(deputyInfoURL, f.personApiToken, f.appApiKey, deputyID)
+	apiURL := f.getDeputyInfoApiUrl(deputyId)
 	resp, err := utils.DoSimpleRequest(apiURL)
 	if err != nil {
 		return empty, fmt.Errorf("fetch deputy info request failed: %w", err)

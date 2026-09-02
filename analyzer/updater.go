@@ -151,6 +151,10 @@ func (u *Updater) UpdateDeputiesAndFactions() error {
 	return nil
 }
 
+func (u *Updater) UpdateDrafts() error {
+	return nil
+}
+
 // UpdateData refreshes the data if enough time has elapsed.
 func (u *Updater) UpdateDatabase() error {
 	update, err := u.ShouldUpdate()
@@ -161,5 +165,8 @@ func (u *Updater) UpdateDatabase() error {
 	if err != nil {
 		return err
 	}
+
+	err = u.UpdateDrafts()
+
 	return nil
 }
