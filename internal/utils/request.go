@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -13,6 +14,7 @@ const DefaultTimeout = 30 * time.Second
 
 // DoSimpleRequest performs a GET request with a user-agent header and returns the response.
 func DoSimpleRequest(apiURL string) (*http.Response, error) {
+	_, _ = fmt.Fprintf(os.Stdout, "Do request. URL = %s\n", apiURL)
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

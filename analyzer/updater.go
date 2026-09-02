@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -152,7 +154,47 @@ func (u *Updater) UpdateDeputiesAndFactions() error {
 }
 
 func (u *Updater) UpdateDrafts() error {
+	votings, err := u.fetcher.FetchVotings(1, 5)
+	if err != nil {
+		u.logger.Error("Can not update drafts. Get an error while fetching.", "err", err)
+		return err
+	}
+	const pageSize = 100
+	totalVotingsCount, err := strconv.Atoi(votings.TotalCount)
+	if err != nil {
+		u.logger.Error("Can not parse total count from votes response.", "err", err)
+		return err
+	}
+	pagesToInspect := totalVotingsCount / pageSize
+	if totalVotingsCount%pageSize != 0 {
+		pagesToInspect += 1
+	}
+
+	for pageNum := range pagesToInspect {
+		votings, err := u.fetcher.FetchVotings(pageNum, pageSize)
+		if err != nil {
+			u.logger.Error("Can not update drafts. Get an error while fetching.", " err", err)
+			return err
+		}
+
+		_ = parseDraftLawIds(votings.Votes)
+	}
+
 	return nil
+}
+
+func parseDraftLawIds(votings []Vote) []string {
+	re := regexp.MustCompile(`№ [0-9]*-[0-9]`)
+	var draftLawIds []string
+	for _, voteInfo := range votings {
+		rawId := re.FindString(voteInfo.Subject)
+		id := strings.TrimLeft(rawId, "№ ")
+		if len(id) != 0 {
+			draftLawIds = append(draftLawIds, id)
+		}
+	}
+
+	return draftLawIds
 }
 
 // UpdateData refreshes the data if enough time has elapsed.

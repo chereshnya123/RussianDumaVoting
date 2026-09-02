@@ -12,11 +12,11 @@ type Question struct {
 
 // VoteResponse represents the top-level Duma API response for voting results.
 type VoteResponse struct {
-	TotalCount int      `json:"totalCount"` // Total number of voting records
-	Page       int      `json:"page"`       // Current page number
-	PageSize   int      `json:"pageSize"`   // Number of items per page
-	Wordings   []string `json:"wording"`    // Description of the voting period/query
-	Votes      []Vote   `json:"votes"`      // Array of voting records
+	TotalCount string `json:"totalCount"` // Total number of voting records
+	Page       string `json:"page"`       // Current page number
+	PageSize   string `json:"pageSize"`   // Number of items per page
+	Wordings   string `json:"wording"`    // Description of the voting period/query
+	Votes      []Vote `json:"votes"`      // Array of voting records
 }
 
 // Vote represents a single voting record from the Duma API.

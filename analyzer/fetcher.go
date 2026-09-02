@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 
 	"dumaVote/internal/utils"
 )
@@ -24,6 +25,11 @@ func (f Fetcher) getAllDeputiesApiUrl() string {
 func (f Fetcher) getDeputyInfoApiUrl(deputyId string) string {
 	const deputyInfoURL = "http://api.duma.gov.ru/api/%s/deputy.json?app_token=%s&id=%s"
 	return fmt.Sprintf(deputyInfoURL, f.personApiToken, f.appApiKey, deputyId)
+}
+
+func (f Fetcher) getVotingsApiUrl(pageNum, limit int) string {
+	const votingsApiUrl = "http://api.duma.gov.ru/api/%s/voteSearch.json?app_token=%s&page=%d&limit=%d"
+	return fmt.Sprintf(votingsApiUrl, f.personApiToken, f.appApiKey, pageNum, limit)
 }
 
 // NewFetcher creates a new Fetcher.
@@ -93,27 +99,31 @@ func (f *Fetcher) FetchDeputyInfo(deputyId string) (DeputyInfo, error) {
 	return deputyResp, nil
 }
 
-// FetchVotes fetches voting results from the Duma API and unmarshals into VoteResponse.
-func (f *Fetcher) FetchVotes(apiURL string) (VoteResponse, error) {
-	var empty VoteResponse
-
-	resp, err := utils.DoSimpleRequest(apiURL)
-	if err != nil {
-		return empty, fmt.Errorf("fetch votes request failed: %w", err)
+// Requests `limit` votings from page with given number
+func (f *Fetcher) FetchVotings(pageNum, limit int) (VoteResponse, error) {
+	if !slices.Contains([]int{5, 10, 20, 50, 100}, limit) {
+		return VoteResponse{}, fmt.Errorf("Can not fetch votings. Get unexpected `limit` parameter. Available values = [5, 10, 20, 50, 100]")
 	}
+	votingsApiUrl := f.getVotingsApiUrl(pageNum, limit)
+	resp, err := utils.DoSimpleRequest(votingsApiUrl)
+
+	if err != nil {
+		return VoteResponse{}, fmt.Errorf("Can not fetch votes request: %w", err)
+	}
+
 	if resp == nil {
-		return empty, nil
+		return VoteResponse{}, nil
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return empty, fmt.Errorf("read votes response body: %w", err)
+		return VoteResponse{}, fmt.Errorf("Can not read votes response body: %w", err)
 	}
 
 	var votesResp VoteResponse
 	if err := json.Unmarshal(bodyBytes, &votesResp); err != nil {
-		return empty, fmt.Errorf("unmarshal votes response: %w", err)
+		return VoteResponse{}, fmt.Errorf("Can not unmarshal votes response: %w", err)
 	}
 
 	return votesResp, nil
