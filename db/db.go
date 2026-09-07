@@ -123,6 +123,26 @@ func (d *Database) SaveDeputyUpsert(deputy *Deputy) error {
 	return nil
 }
 
+func (d *Database) SaveLawDrafts(LawDrafts []LawDraft) error {
+	for _, lawDraft := range LawDrafts {
+		if err := d.SaveLawDraft(lawDraft); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *Database) SaveLawDraft(lawDraft LawDraft) error {
+	query := `INSERT INTO law_drafts (name, number)
+						VALUES(?, ?)`
+	if _, err := d.db.Exec(query, lawDraft.Name, lawDraft.Number); err != nil {
+		return fmt.Errorf("can not save law draft in database. Err = %w", err)
+	}
+
+	return nil
+}
+
 func (d *Database) isFactionExists(factionApiId int64) bool {
 	query := `SELECT COUNT(*) FROM factions where api_id == ?`
 	var count int64

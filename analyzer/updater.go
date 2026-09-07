@@ -10,20 +10,32 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
+
+type updaterConfig struct {
+	MaxLawsToUpdate int `yaml:"max_laws_to_update"`
+}
 
 type Updater struct {
 	db      *db.Database
 	fetcher Fetcher
 	// parser  Parser
 	logger *slog.Logger
+	cfg    updaterConfig
 }
 
 func NewUpdater(appApiKey, personApiKey string, db *db.Database, logger *slog.Logger) *Updater {
+	updaterCfg := updaterConfig{}
+	if err := cleanenv.ReadConfig("config/updater.yaml", &updaterCfg); err != nil {
+		panic(fmt.Sprintf("Can not read updater config. Err = %s", err.Error()))
+	}
 	return &Updater{
 		db:      db,
 		fetcher: *NewFetcher(appApiKey, personApiKey, logger),
 		logger:  logger,
+		cfg:     updaterCfg,
 	}
 }
 
@@ -152,14 +164,14 @@ func (u *Updater) UpdateDeputiesAndFactions() error {
 	return nil
 }
 
-func (u *Updater) fetchDraftLaws(pageNum, pageSize int) ([]string, error) {
+func (u *Updater) fetchLawDrafts(pageNum, pageSize int) ([]db.LawDraft, error) {
 	votings, err := u.fetcher.FetchVotings(pageNum, pageSize)
 	if err != nil {
 		u.logger.Error("Can not update drafts. Get an error while fetching.", " err", err)
-		return []string{}, err
+		return []db.LawDraft{}, err
 	}
 
-	return parseDraftLawIds(votings.Votes), nil
+	return parseLawDraft(votings.Votes), nil
 }
 
 func (u *Updater) UpdateDrafts() error {
@@ -174,33 +186,36 @@ func (u *Updater) UpdateDrafts() error {
 		u.logger.Error("Can not parse total count from votes response.", "err", err)
 		return err
 	}
-	pagesToInspect := totalVotingsCount / pageSize
+	pagesToInspect := min(u.cfg.MaxLawsToUpdate/pageSize, totalVotingsCount/pageSize)
 	if totalVotingsCount%pageSize != 0 {
 		pagesToInspect += 1
 	}
 
 	for pageNum := range pagesToInspect {
-		_, err := u.fetchDraftLaws(pageNum, pageSize)
+		lawDrafts, err := u.fetchLawDrafts(pageNum, pageSize)
 		if err != nil {
 			return err
 		}
+
+		u.db.SaveLawDrafts(lawDrafts)
 	}
 
 	return nil
 }
 
-func parseDraftLawIds(votings []Vote) []string {
+func parseLawDraft(votings []Vote) []db.LawDraft {
 	re := regexp.MustCompile(`№ [0-9]*-[0-9]`)
-	var draftLawIds []string
+	var lawDrafts []db.LawDraft
 	for _, voteInfo := range votings {
+		lawName := voteInfo.Subject
 		rawId := re.FindString(voteInfo.Subject)
 		id := strings.TrimLeft(rawId, "№ ")
 		if len(id) != 0 {
-			draftLawIds = append(draftLawIds, id)
+			lawDrafts = append(lawDrafts, db.LawDraft{Id: 0, Name: lawName, Number: rawId})
 		}
 	}
 
-	return draftLawIds
+	return lawDrafts
 }
 
 // UpdateData refreshes the data if enough time has elapsed.
