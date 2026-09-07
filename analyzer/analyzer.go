@@ -19,18 +19,12 @@ func NewAnalyzer(appApiKey, personApiKey string, db *db.Database, logger *slog.L
 	}
 }
 
-func (a *Analyzer) GetLastQuestion() (db.Question, error) {
+func (a *Analyzer) GetLastVoting() (db.LawDraft, error) {
 	err := a.updater.UpdateDatabase()
 	if err != nil {
 		a.logger.Error("Cannot get latest voting. Can not update database", " Error", err)
-		return db.Question{}, err
+		return db.LawDraft{}, err
 	}
 
-	voting, err := a.db.GetLatestVoting()
-	if err != nil {
-		a.logger.Error("Cannot get latest voting. Can not fetch data from database", " Error", err)
-		return db.Question{}, err
-	}
-
-	return a.db.GetQuestionByID(voting.QuestionId)
+	return db.LawDraft{}, nil
 }

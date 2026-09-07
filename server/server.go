@@ -102,9 +102,9 @@ func (s *DumaVotesServer) route(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *DumaVotesServer) HandleLastMeetingQuestion(w http.ResponseWriter, r *http.Request) {
-	lastQuestion, err := s.analyzer.GetLastQuestion()
+	lastVoting, err := s.analyzer.GetLastVoting()
 	if err != nil {
-		s.logger.Error("Can not get last question.", "Error", err)
+		s.logger.Error("Can not get last voting.", "Error", err)
 		w.WriteHeader(500)
 		return
 	}
@@ -115,7 +115,7 @@ func (s *DumaVotesServer) HandleLastMeetingQuestion(w http.ResponseWriter, r *ht
 		return
 	}
 
-	err = tmpl.Execute(w, []db.Question{lastQuestion})
+	err = tmpl.Execute(w, []db.LawDraft{lastVoting})
 	if err != nil {
 		log.Print(err.Error())
 		s.logger.Error(err.Error())

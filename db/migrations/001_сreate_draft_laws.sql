@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS law_drafts (
   id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL
+  name TEXT NOT NULL,
+  number TEXT NOT NULL
 );

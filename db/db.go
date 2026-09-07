@@ -90,39 +90,12 @@ func (d *Database) GetLastUpdateTime() (time.Time, error) {
 	return lastUpdate, nil
 }
 
-func (d *Database) GetLatestVoting() (Voting, error) {
-	var v Voting
-	query := `SELECT id, name, date, question_id, factions, result
-	          FROM votings ORDER BY date DESC LIMIT 1`
-	if err := d.db.QueryRow(query).Scan(
-		&v.Id, &v.Name, &v.Date, &v.QuestionId, &v.Factions, &v.Result,
-	); err != nil {
-		return Voting{}, fmt.Errorf("get latest voting: %w", err)
-	}
-	return v, nil
-}
-
-func (d *Database) GetQuestionByID(questionId int64) (Question, error) {
-	var q Question
-	query := `SELECT id, name, tags, votings_id, profile_committee_id,
-	                  responsible_committee_id, other_committees, authors
-	          FROM questions WHERE id = ?`
-	if err := d.db.QueryRow(query, questionId).Scan(
-		&q.Id, &q.Name, &q.Tags, &q.VotingsId,
-		&q.ProfileCommitteeId, &q.ResponsibleCommitteeId,
-		&q.OtherCommittees, &q.Authors,
-	); err != nil {
-		return Question{}, fmt.Errorf("get question by id %d: %w", questionId, err)
-	}
-	return q, nil
-}
-
 // SaveDeputy inserts a deputy into the database. SQLite auto-generates the internal
 // rowid (ID); the Deputy.APIID field is stored in the api_id column.
 func (d *Database) SaveDeputy(deputy *Deputy) error {
-	query := `INSERT INTO deputies (api_id, full_name, faction, department)
-	          VALUES (?, ?, ?, ?)`
-	result, err := d.db.Exec(query, deputy.ApiId, deputy.FullName, deputy.FactionId, deputy.Department)
+	query := `INSERT INTO deputies (api_id, full_name, faction)
+	          VALUES (?, ?, ?)`
+	result, err := d.db.Exec(query, deputy.ApiId, deputy.FullName, deputy.FactionId)
 	if err != nil {
 		return fmt.Errorf("insert deputy api_id=%d: %w", deputy.ApiId, err)
 	}
@@ -138,13 +111,12 @@ func (d *Database) SaveDeputy(deputy *Deputy) error {
 
 // SaveDeputyUpsert inserts a deputy or updates it if the api_id already exists.
 func (d *Database) SaveDeputyUpsert(deputy *Deputy) error {
-	query := `INSERT INTO deputies (api_id, full_name, faction, department)
-	          VALUES (?, ?, ?, ?)
+	query := `INSERT INTO deputies (api_id, full_name, faction)
+	          VALUES (?, ?, ?)
 	          ON CONFLICT(api_id) DO UPDATE SET
 	            full_name = excluded.full_name,
-	            faction   = excluded.faction,
-	            department = excluded.department`
-	if _, err := d.db.Exec(query, deputy.ApiId, deputy.FullName, deputy.FactionId, deputy.Department); err != nil {
+	            faction   = excluded.faction`
+	if _, err := d.db.Exec(query, deputy.ApiId, deputy.FullName, deputy.FactionId); err != nil {
 		return fmt.Errorf("upsert deputy api_id=%d: %w", deputy.ApiId, err)
 	}
 
@@ -169,7 +141,7 @@ func (d *Database) SaveFaction(faction *Faction) error {
 	}
 
 	query := `INSERT INTO factions (api_id, name, head)
-						VALUES (?, ?, ?)`
+		VALUES (?, ?, ?)`
 	result, err := d.db.Exec(query, faction.ApiId, faction.Name, faction.HeadId)
 	if err != nil {
 		return fmt.Errorf("insert faction api_id=%d: %w", faction.ApiId, err)

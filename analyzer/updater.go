@@ -123,7 +123,6 @@ func (u *Updater) UpdateDeputiesAndFactions() error {
 		deputy.ApiId = apiId
 		deputy.FullName = rawDeputy.Name
 		deputy.FactionId = int64(currentFactionId)
-		deputy.Department = -1
 
 		err = u.updateFactions(rawDeputy.Factions)
 		if err != nil {
@@ -153,6 +152,16 @@ func (u *Updater) UpdateDeputiesAndFactions() error {
 	return nil
 }
 
+func (u *Updater) fetchDraftLaws(pageNum, pageSize int) ([]string, error) {
+	votings, err := u.fetcher.FetchVotings(pageNum, pageSize)
+	if err != nil {
+		u.logger.Error("Can not update drafts. Get an error while fetching.", " err", err)
+		return []string{}, err
+	}
+
+	return parseDraftLawIds(votings.Votes), nil
+}
+
 func (u *Updater) UpdateDrafts() error {
 	votings, err := u.fetcher.FetchVotings(1, 5)
 	if err != nil {
@@ -171,13 +180,10 @@ func (u *Updater) UpdateDrafts() error {
 	}
 
 	for pageNum := range pagesToInspect {
-		votings, err := u.fetcher.FetchVotings(pageNum, pageSize)
+		_, err := u.fetchDraftLaws(pageNum, pageSize)
 		if err != nil {
-			u.logger.Error("Can not update drafts. Get an error while fetching.", " err", err)
 			return err
 		}
-
-		_ = parseDraftLawIds(votings.Votes)
 	}
 
 	return nil
