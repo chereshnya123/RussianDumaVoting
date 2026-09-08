@@ -197,7 +197,11 @@ func (u *Updater) UpdateDrafts() error {
 			return err
 		}
 
-		u.db.SaveLawDrafts(lawDrafts)
+		err = u.db.SaveLawDrafts(lawDrafts)
+		if err != nil {
+			u.logger.Error("Can not save law drafts.", "Err", err.Error())
+			return fmt.Errorf("Can not save law drafts. Err = %w", err)
+		}
 	}
 
 	return nil
