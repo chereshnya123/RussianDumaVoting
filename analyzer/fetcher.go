@@ -115,14 +115,14 @@ func (f *Fetcher) FetchDeputyInfo(deputyId string) (DeputyInfo, error) {
 // Requests `limit` votings from page with given number
 func (f *Fetcher) FetchVotings(pageNum, limit int) (VoteResponse, error) {
 	if !slices.Contains([]int{5, 10, 20, 50, 100}, limit) {
-		return VoteResponse{}, fmt.Errorf("Can not fetch votings. Get unexpected `limit` parameter. Available values = [5, 10, 20, 50, 100]")
+		return VoteResponse{}, fmt.Errorf("can not fetch votings. Get unexpected `limit` parameter. Available values = [5, 10, 20, 50, 100]")
 	}
 	params := map[string]string{"page_num": strconv.Itoa(pageNum), "limit": strconv.Itoa(limit)}
 	votingsApiUrl := f.getVotingsApiUrl(params)
 	resp, err := utils.DoSimpleRequest(votingsApiUrl)
 
 	if err != nil {
-		return VoteResponse{}, fmt.Errorf("Can not fetch votes request: %w", err)
+		return VoteResponse{}, fmt.Errorf("can not fetch votes request: %w", err)
 	}
 
 	if resp == nil {
@@ -132,12 +132,12 @@ func (f *Fetcher) FetchVotings(pageNum, limit int) (VoteResponse, error) {
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return VoteResponse{}, fmt.Errorf("Can not read votes response body: %w", err)
+		return VoteResponse{}, fmt.Errorf("can not read votes response body: %w", err)
 	}
 
 	var votesResp VoteResponse
 	if err := json.Unmarshal(bodyBytes, &votesResp); err != nil {
-		return VoteResponse{}, fmt.Errorf("Can not unmarshal votes response: %w", err)
+		return VoteResponse{}, fmt.Errorf("can not unmarshal votes response: %w", err)
 	}
 
 	return votesResp, nil
@@ -146,7 +146,7 @@ func (f *Fetcher) FetchVotings(pageNum, limit int) (VoteResponse, error) {
 func (f *Fetcher) GetLastLawVoting(lawNumber string) (Vote, error) {
 	allVotingsInfos, err := f.fetchAllLawVotings(lawNumber)
 	if err != nil {
-		return Vote{}, fmt.Errorf("Can not get last law voting: %w", err)
+		return Vote{}, fmt.Errorf("can not get last law voting: %w", err)
 	}
 	return slices.MaxFunc(allVotingsInfos, func(a, b Vote) int { return cmp.Compare(a.VoteDate, b.VoteDate) }), nil
 }
@@ -157,7 +157,7 @@ func (f *Fetcher) fetchAllLawVotings(lawNumber string) ([]Vote, error) {
 	votingsApiUrl := f.getVotingsApiUrl(params)
 	resp, err := utils.DoSimpleRequest(votingsApiUrl)
 	if err != nil {
-		return []Vote{}, fmt.Errorf("Can not all law votings request: %w", err)
+		return []Vote{}, fmt.Errorf("can not all law votings request: %w", err)
 	}
 
 	if resp == nil {
@@ -166,12 +166,12 @@ func (f *Fetcher) fetchAllLawVotings(lawNumber string) ([]Vote, error) {
 	defer func() { _ = resp.Body.Close() }()
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return []Vote{}, fmt.Errorf("Can not read all law votings response body: %w", err)
+		return []Vote{}, fmt.Errorf("can not read all law votings response body: %w", err)
 	}
 
 	var votesResp VoteResponse
 	if err := json.Unmarshal(bodyBytes, &votesResp); err != nil {
-		return []Vote{}, fmt.Errorf("Can not unmarshal votes response: %w", err)
+		return []Vote{}, fmt.Errorf("can not unmarshal votes response: %w", err)
 	}
 
 	return votesResp.Votes, nil
