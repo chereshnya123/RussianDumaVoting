@@ -50,66 +50,47 @@ func NewFetcher(appApiKey, personApiKey string, logger *slog.Logger) *Fetcher {
 	return &Fetcher{appApiKey: appApiKey, personApiToken: personApiKey, logger: logger}
 }
 
+// Generic function for fetching responses from duma api
+func (f *Fetcher) FetchDataFromApi(parsedOutput any, apiUrl string) error {
+	resp, err := utils.DoSimpleRequest(apiUrl)
+	if err != nil {
+		return fmt.Errorf("fetch deputies request failed: %w", err)
+	}
+	if resp == nil {
+		return nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read deputies response body: %w", err)
+	}
+
+	if err := json.Unmarshal(bodyBytes, parsedOutput); err != nil {
+		return fmt.Errorf("unmarshal deputies response: %w", err)
+	}
+
+	return nil
+}
+
 // FetchAllDeputies fetches all deputies from the Duma API.
 // The API returns a bare JSON array [{...}], not a wrapper object.
 func (f *Fetcher) FetchAllDeputies() ([]Deputy, error) {
 
 	apiURL := f.getAllDeputiesApiUrl()
 	f.logger.Debug("Fetch all deputy data", "url", apiURL)
-	resp, err := utils.DoSimpleRequest(apiURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetch deputies request failed: %w", err)
-	}
-	if resp == nil {
-		return nil, nil
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read deputies response body: %w", err)
-	}
-
 	var deputies []Deputy
-	if err := json.Unmarshal(bodyBytes, &deputies); err != nil {
-		return nil, fmt.Errorf("unmarshal deputies response: %w", err)
-	}
-
-	return deputies, nil
+	err := f.FetchDataFromApi(&deputies, apiURL)
+	return deputies, err
 }
 
 // FetchDeputyInfo fetches detailed deputy profile from the Duma API.
 // The API returns a single JSON object { ... } with the deputy's data.
 func (f *Fetcher) FetchDeputyInfo(deputyId string) (DeputyInfo, error) {
-	var empty DeputyInfo
-
 	apiURL := f.getDeputyInfoApiUrl(deputyId)
-	resp, err := utils.DoSimpleRequest(apiURL)
-	if err != nil {
-		return empty, fmt.Errorf("fetch deputy info request failed: %w", err)
-	}
-
-	if resp == nil {
-		return empty, nil
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return empty, fmt.Errorf("read deputy info response body: %w", err)
-	}
-
-	var deputyResp DeputyInfo
-	if err := json.Unmarshal(bodyBytes, &deputyResp); err != nil {
-		// Fallback: try unmarshalling as array [{...}]
-		var deputies []DeputyInfo
-		if arrErr := json.Unmarshal(bodyBytes, &deputies); arrErr == nil && len(deputies) > 0 {
-			return deputies[0], nil
-		}
-		return empty, fmt.Errorf("unmarshal deputy info response (tried object and array): %w", err)
-	}
-
-	return deputyResp, nil
+	var deputyInfo DeputyInfo
+	err := f.FetchDataFromApi(&deputyInfo, apiURL)
+	return deputyInfo, err
 }
 
 // Requests `limit` votings from page with given number
@@ -119,28 +100,11 @@ func (f *Fetcher) FetchVotings(pageNum, limit int) (VoteResponse, error) {
 	}
 	params := map[string]string{"page_num": strconv.Itoa(pageNum), "limit": strconv.Itoa(limit)}
 	votingsApiUrl := f.getVotingsApiUrl(params)
-	resp, err := utils.DoSimpleRequest(votingsApiUrl)
 
-	if err != nil {
-		return VoteResponse{}, fmt.Errorf("can not fetch votes request: %w", err)
-	}
+	var voteResponse VoteResponse
+	err := f.FetchDataFromApi(&voteResponse, votingsApiUrl)
 
-	if resp == nil {
-		return VoteResponse{}, nil
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return VoteResponse{}, fmt.Errorf("can not read votes response body: %w", err)
-	}
-
-	var votesResp VoteResponse
-	if err := json.Unmarshal(bodyBytes, &votesResp); err != nil {
-		return VoteResponse{}, fmt.Errorf("can not unmarshal votes response: %w", err)
-	}
-
-	return votesResp, nil
+	return voteResponse, err
 }
 
 func (f *Fetcher) GetLastLawVoting(lawNumber string) (Vote, error) {
@@ -155,51 +119,18 @@ func (f *Fetcher) GetLastLawVoting(lawNumber string) (Vote, error) {
 func (f *Fetcher) fetchAllLawVotings(lawNumber string) ([]Vote, error) {
 	params := map[string]string{"number": lawNumber}
 	votingsApiUrl := f.getVotingsApiUrl(params)
-	resp, err := utils.DoSimpleRequest(votingsApiUrl)
-	if err != nil {
-		return []Vote{}, fmt.Errorf("can not all law votings request: %w", err)
-	}
-
-	if resp == nil {
-		return []Vote{}, nil
-	}
-	defer func() { _ = resp.Body.Close() }()
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return []Vote{}, fmt.Errorf("can not read all law votings response body: %w", err)
-	}
 
 	var votesResp VoteResponse
-	if err := json.Unmarshal(bodyBytes, &votesResp); err != nil {
-		return []Vote{}, fmt.Errorf("can not unmarshal votes response: %w", err)
-	}
-
-	return votesResp.Votes, nil
+	err := f.FetchDataFromApi(&votesResp, votingsApiUrl)
+	return votesResp.Votes, err
 }
 
 func (f *Fetcher) fetchVotingInfo(votingId int) (VoteDetailResponse, error) {
 	const votingInfoUrlTemplate = "http://api.duma.gov.ru/api/%s/vote/%d.json?app_token=%s"
 	apiURL := fmt.Sprintf(votingInfoUrlTemplate, f.personApiToken, votingId, f.appApiKey)
 
-	resp, err := utils.DoSimpleRequest(apiURL)
-	if err != nil {
-		return VoteDetailResponse{}, fmt.Errorf("can not fetch voting info request failed: %w", err)
-	}
-
-	if resp == nil {
-		return VoteDetailResponse{}, nil
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return VoteDetailResponse{}, fmt.Errorf("can not read voting info response body: %w", err)
-	}
-
 	var votingInfo VoteDetailResponse
-	if err := json.Unmarshal(bodyBytes, &votingInfo); err != nil {
-		return VoteDetailResponse{}, fmt.Errorf("can not unmarshal voting info response: %w", err)
-	}
+	err := f.FetchDataFromApi(&votingInfo, apiURL)
 
-	return votingInfo, nil
+	return votingInfo, err
 }
