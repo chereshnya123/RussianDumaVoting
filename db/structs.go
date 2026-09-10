@@ -22,12 +22,12 @@ type Deputy struct {
 // Columns:
 //
 //	id       – INTEGER PRIMARY KEY
-//	api_id   – INTEGER UNIQUE
+//	code     – INTEGER UNIQUE
 //	name     – TEXT
 //	head     – INTEGER (FK to deputies.id)
 type Faction struct {
 	Id     int64  `db:"id" json:"id"`
-	ApiId  int64  `db:"api_id" json:"api_id"`
+	Code   int64  `db:"code" json:"code"`
 	Name   string `db:"name" json:"name"`
 	HeadId int64  `db:"head" json:"head_id"`
 }

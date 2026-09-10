@@ -97,12 +97,12 @@ func (u *Updater) updateFactions(factions []Faction) error {
 	}
 
 	var faction db.Faction
-	faction.ApiId = int64(currentFactionId)
+	faction.Code = int64(currentFactionId)
 	faction.Name = currentFaction.Name
 
 	err = u.db.SaveFaction(&faction)
 	if err != nil {
-		u.logger.Error("cannot save faction in database.", "factionId", faction.ApiId)
+		u.logger.Error("cannot save faction in database.", "factionId", faction.Code)
 		return err
 	}
 
@@ -156,9 +156,9 @@ func (u *Updater) UpdateDeputiesAndFactions() error {
 	for _, faction := range factions {
 		err = u.db.SaveFaction(&faction)
 		if err != nil {
-			return fmt.Errorf("can not save faction. Id = %d, name = %s. Error = %v", faction.ApiId, faction.Name, err)
+			return fmt.Errorf("can not save faction. Id = %d, name = %s. Error = %v", faction.Code, faction.Name, err)
 		}
-		u.logger.Info("Save faction. ", "id", faction.ApiId, "name", faction.Name)
+		u.logger.Info("Save faction. ", "id", faction.Code, "name", faction.Name)
 	}
 
 	return nil
@@ -205,6 +205,7 @@ func (u *Updater) UpdateDrafts() error {
 
 		for _, lawDraft := range lawDrafts {
 			lawNumber := lawDraft.Number
+			u.logger.Info(fmt.Sprintf("Get law number = \"%s\"", lawNumber))
 			lastVoting, err := u.fetcher.GetLastLawVoting(lawNumber)
 			if err != nil {
 				u.logger.Error("Can not get last law voting.", "Err", err.Error())
@@ -225,7 +226,7 @@ func (u *Updater) UpdateDrafts() error {
 }
 
 func parseLawDraft(votings []Vote) []db.LawDraft {
-	re := regexp.MustCompile(`№ [0-9]*-[0-9]`)
+	re := regexp.MustCompile(`[0-9]*-[0-9]`)
 	var lawDrafts []db.LawDraft
 	for _, voteInfo := range votings {
 		lawName := voteInfo.Subject

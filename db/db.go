@@ -144,11 +144,11 @@ func (d *Database) SaveLawDraft(lawDraft LawDraft) error {
 }
 
 func (d *Database) isFactionExists(factionApiId int64) bool {
-	query := `SELECT COUNT(*) FROM factions where api_id == ?`
+	query := `SELECT COUNT(*) FROM factions where code == ?`
 	var count int64
 	err := d.db.QueryRow(query, factionApiId).Scan(&count)
 	if err != nil && err != sql.ErrNoRows {
-		panic(fmt.Sprintf("can not check if faction exists. Faction api_id = %d, err = %s", factionApiId, err.Error()))
+		panic(fmt.Sprintf("can not check if faction exists. Faction code = %d, err = %s", factionApiId, err.Error()))
 	}
 
 	return count != 0
@@ -156,15 +156,15 @@ func (d *Database) isFactionExists(factionApiId int64) bool {
 
 // SaveFaction inserts a faction into the database.
 func (d *Database) SaveFaction(faction *Faction) error {
-	if d.isFactionExists(faction.ApiId) {
+	if d.isFactionExists(faction.Code) {
 		return nil
 	}
 
-	query := `INSERT INTO factions (api_id, name, head)
+	query := `INSERT INTO factions (code, name, head)
 		VALUES (?, ?, ?)`
-	result, err := d.db.Exec(query, faction.ApiId, faction.Name, faction.HeadId)
+	result, err := d.db.Exec(query, faction.Code, faction.Name, faction.HeadId)
 	if err != nil {
-		return fmt.Errorf("insert faction api_id=%d: %w", faction.ApiId, err)
+		return fmt.Errorf("insert faction code=%d: %w", faction.Code, err)
 	}
 
 	id, err := result.LastInsertId()
