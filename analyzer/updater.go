@@ -202,6 +202,23 @@ func (u *Updater) UpdateDrafts() error {
 			u.logger.Error("Can not save law drafts.", "Err", err.Error())
 			return fmt.Errorf("Can not save law drafts. Err = %w", err)
 		}
+
+		for _, lawDraft := range lawDrafts {
+			lawNumber := lawDraft.Number
+			lastVoting, err := u.fetcher.GetLastLawVoting(lawNumber)
+			if err != nil {
+				u.logger.Error("Can not get last law voting.", "Err", err.Error())
+				return fmt.Errorf("Can not get last law voting. Err = %w", err)
+			}
+			lastVotingId := lastVoting.Id
+			_, err = u.fetcher.fetchVotingInfo(lastVotingId)
+			if err != nil {
+				return fmt.Errorf("can not fetch voting info. Err = %w", err)
+			}
+			// factionVotes := parseFactionVotes(lastVotingInfo.ResultsByFaction)
+			// u.db.SaveFactionVotes(factionVotes)
+		}
+
 	}
 
 	return nil

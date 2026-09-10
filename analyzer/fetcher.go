@@ -1,11 +1,13 @@
 package analyzer
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"slices"
+	"strconv"
 
 	"dumaVote/internal/utils"
 )
@@ -18,18 +20,29 @@ type Fetcher struct {
 }
 
 func (f Fetcher) getAllDeputiesApiUrl() string {
-	const deputiesURL = "http://api.duma.gov.ru/api/%s/deputies.json?app_token=%s"
-	return fmt.Sprintf(deputiesURL, f.personApiToken, f.appApiKey)
+	const deputiesUrlTemplate = "http://api.duma.gov.ru/api/%s/deputies.json?app_token=%s"
+	return fmt.Sprintf(deputiesUrlTemplate, f.personApiToken, f.appApiKey)
 }
 
 func (f Fetcher) getDeputyInfoApiUrl(deputyId string) string {
-	const deputyInfoURL = "http://api.duma.gov.ru/api/%s/deputy.json?app_token=%s&id=%s"
-	return fmt.Sprintf(deputyInfoURL, f.personApiToken, f.appApiKey, deputyId)
+	const deputyInfoUrlTemplate = "http://api.duma.gov.ru/api/%s/deputy.json?app_token=%s&id=%s"
+	return fmt.Sprintf(deputyInfoUrlTemplate, f.personApiToken, f.appApiKey, deputyId)
 }
 
-func (f Fetcher) getVotingsApiUrl(pageNum, limit int) string {
-	const votingsApiUrl = "http://api.duma.gov.ru/api/%s/voteSearch.json?app_token=%s&page=%d&limit=%d"
-	return fmt.Sprintf(votingsApiUrl, f.personApiToken, f.appApiKey, pageNum, limit)
+func (f Fetcher) getVotingsApiUrl(params map[string]string) string {
+	const votingsApiUrlTemplate = "http://api.duma.gov.ru/api/%s/voteSearch.json?app_token=%s&page=%s&limit=%s"
+	votingsApiUrl := fmt.Sprintf(votingsApiUrlTemplate, f.personApiToken, f.appApiKey, "0", "0")
+	paramsInserted := 0
+	for key, value := range params {
+		if paramsInserted == 0 {
+			votingsApiUrl = fmt.Sprintf("%s?%s=%s", votingsApiUrl, key, value)
+			paramsInserted++
+			continue
+		}
+		votingsApiUrl = fmt.Sprintf("%s&%s=%s", votingsApiUrl, key, value)
+	}
+
+	return votingsApiUrl
 }
 
 // NewFetcher creates a new Fetcher.
@@ -104,7 +117,8 @@ func (f *Fetcher) FetchVotings(pageNum, limit int) (VoteResponse, error) {
 	if !slices.Contains([]int{5, 10, 20, 50, 100}, limit) {
 		return VoteResponse{}, fmt.Errorf("Can not fetch votings. Get unexpected `limit` parameter. Available values = [5, 10, 20, 50, 100]")
 	}
-	votingsApiUrl := f.getVotingsApiUrl(pageNum, limit)
+	params := map[string]string{"page_num": strconv.Itoa(pageNum), "limit": strconv.Itoa(limit)}
+	votingsApiUrl := f.getVotingsApiUrl(params)
 	resp, err := utils.DoSimpleRequest(votingsApiUrl)
 
 	if err != nil {
@@ -127,4 +141,65 @@ func (f *Fetcher) FetchVotings(pageNum, limit int) (VoteResponse, error) {
 	}
 
 	return votesResp, nil
+}
+
+func (f *Fetcher) GetLastLawVoting(lawNumber string) (Vote, error) {
+	allVotingsInfos, err := f.fetchAllLawVotings(lawNumber)
+	if err != nil {
+		return Vote{}, fmt.Errorf("Can not get last law voting: %w", err)
+	}
+	return slices.MaxFunc(allVotingsInfos, func(a, b Vote) int { return cmp.Compare(a.VoteDate, b.VoteDate) }), nil
+}
+
+// Must be generic: I) return struct II) func to generate url
+func (f *Fetcher) fetchAllLawVotings(lawNumber string) ([]Vote, error) {
+	params := map[string]string{"number": lawNumber}
+	votingsApiUrl := f.getVotingsApiUrl(params)
+	resp, err := utils.DoSimpleRequest(votingsApiUrl)
+	if err != nil {
+		return []Vote{}, fmt.Errorf("Can not all law votings request: %w", err)
+	}
+
+	if resp == nil {
+		return []Vote{}, nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return []Vote{}, fmt.Errorf("Can not read all law votings response body: %w", err)
+	}
+
+	var votesResp VoteResponse
+	if err := json.Unmarshal(bodyBytes, &votesResp); err != nil {
+		return []Vote{}, fmt.Errorf("Can not unmarshal votes response: %w", err)
+	}
+
+	return votesResp.Votes, nil
+}
+
+func (f *Fetcher) fetchVotingInfo(votingId int) (VoteDetailResponse, error) {
+	const votingInfoUrlTemplate = "http://api.duma.gov.ru/api/%s/vote/%d.json?app_token=%s"
+	apiURL := fmt.Sprintf(votingInfoUrlTemplate, f.personApiToken, votingId, f.appApiKey)
+
+	resp, err := utils.DoSimpleRequest(apiURL)
+	if err != nil {
+		return VoteDetailResponse{}, fmt.Errorf("can not fetch voting info request failed: %w", err)
+	}
+
+	if resp == nil {
+		return VoteDetailResponse{}, nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return VoteDetailResponse{}, fmt.Errorf("can not read voting info response body: %w", err)
+	}
+
+	var votingInfo VoteDetailResponse
+	if err := json.Unmarshal(bodyBytes, &votingInfo); err != nil {
+		return VoteDetailResponse{}, fmt.Errorf("can not unmarshal voting info response: %w", err)
+	}
+
+	return votingInfo, nil
 }

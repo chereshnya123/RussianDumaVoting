@@ -74,6 +74,43 @@ type DeputyActivity struct {
 	SubdivisionNameGenitive string `json:"subdivisionNameGenitive"` // Subdivision name in genitive case
 }
 
+// VoteDetailResponse represents the top-level response for /api/:token/vote/:id.
+type VoteDetailResponse struct {
+	Date             string              `json:"date"`             // Дата и время голосования
+	LawNumber        string              `json:"lawNumber"`        // Номер законопроекта
+	Subject          string              `json:"subject"`          // Тема голосования
+	Resolution       bool                `json:"resolution"`       // true — принято, false — не принято
+	For              string              `json:"for"`              // Голосов «за»
+	Against          string              `json:"against"`          // Голосов «против»
+	Abstain          string              `json:"abstain"`          // Голосов «воздержался»
+	Absent           string              `json:"absent"`           // Неголосовавших
+	TranscriptLink   string              `json:"transcriptLink"`   // Ссылка на стенограмму
+	ResultsByFaction []VoteFactionResult `json:"resultsByFaction"` // Результаты по фракциям
+	ResultsByDeputy  []VoteDeputyResult  `json:"resultsByDeputy"`  // Результаты по депутатам
+}
+
+// VoteFactionResult holds voting results for a single faction.
+type VoteFactionResult struct {
+	Code    string `json:"code"`    // Код фракции
+	Total   string `json:"total"`   // Общее число депутатов во фракции
+	For     string `json:"for"`     // Голосов «за»
+	Against string `json:"against"` // Голосов «против»
+	Abstain string `json:"abstain"` // Голосов «воздержался»
+	Absent  string `json:"absent"`  // Неголосовавших
+	Name    string `json:"name"`    // Полное название фракции
+	Abbr    string `json:"abbr"`    // Аббревиатура фракции
+}
+
+// VoteDeputyResult holds voting result for a single deputy.
+type VoteDeputyResult struct {
+	Code        string `json:"code"`        // Код депутата
+	Result      string `json:"result"`      // for / against / abstain / absent
+	FactionCode string `json:"factionCode"` // Код фракции депутата
+	Family      string `json:"family"`      // Фамилия
+	Name        string `json:"name"`        // Имя
+	Patronymic  string `json:"patronymic"`  // Отчество
+}
+
 // DeputyInfo represents a full deputy profile from the Duma API.
 type DeputyInfo struct {
 	Id                string            `json:"id"`                // Deputy identifier
