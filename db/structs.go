@@ -56,7 +56,7 @@ type SyncStatus struct {
 	LastSuccessfulUpdate time.Time `db:"last_successful_update" json:"last_successful_update"`
 }
 
-// VoteStageFactionBulletin represents a row in the "vote_stage_votes" table.
+// VoteStageResults represents a row in the "vote_stage_votes" table.
 //
 // Columns:
 //
@@ -66,18 +66,13 @@ type SyncStatus struct {
 //	abstained_count – INTEGER
 //	no_vote_count   – INTEGER
 //	faction_id      – INTEGER (FK to factions.id)
-//	vote_stage_id   – INTEGER (FK to vote_stages.id)
 //
 // Non-persisted fields used during conversion from API response:
-type VoteStageFactionBulletin struct {
-	Id             int64  `db:"id" json:"id"`
-	ForCount       int64  `db:"for_count" json:"for_count"`
-	AgainstCount   int64  `db:"against_count" json:"against_count"`
-	AbstainedCount int64  `db:"abstained_count" json:"abstained_count"`
-	NoVoteCount    int64  `db:"no_vote_count" json:"no_vote_count"`
-	FactionId      int64  `db:"faction_id" json:"faction_id"`
-	VoteStageId    int64  `db:"vote_stage_id" json:"vote_stage_id"`
-	FactionCode    string `db:"-" json:"-"` // API faction code (used to look up faction_id)
-	FactionName    string `db:"-" json:"-"` // Faction full name
-	FactionAbbr    string `db:"-" json:"-"` // Faction abbreviation
+type VoteStageResults struct {
+	Id             int64 `db:"id" json:"id"`
+	ForCount       int64 `db:"for_count" json:"for_count"`
+	AgainstCount   int64 `db:"against_count" json:"against_count"`
+	AbstainedCount int64 `db:"abstained_count" json:"abstained_count"`
+	NoVoteCount    int64 `db:"no_vote_count" json:"no_vote_count"`
+	FactionId      int64 `db:"faction_id" json:"faction_id"`
 }

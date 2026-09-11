@@ -175,3 +175,37 @@ func (d *Database) SaveFaction(faction *Faction) error {
 
 	return nil
 }
+
+// GetFactionByCode returns a faction by its code.
+// Returns sql.ErrNoRows if no faction with the given code exists.
+func (d *Database) GetFactionByCode(code int64) (*Faction, error) {
+	faction := &Faction{}
+	query := `SELECT id, code, name, head FROM factions WHERE code = ?`
+	err := d.db.QueryRow(query, code).Scan(&faction.Id, &faction.Code, &faction.Name, &faction.HeadId)
+	if err != nil {
+		return nil, fmt.Errorf("get faction by code=%d: %w", code, err)
+	}
+
+	return faction, nil
+}
+
+// SaveFactionVotes inserts or updates vote stage results for a list of factions.
+// Uses UPSERT based on UNIQUE(faction_id, vote_stage_id) constraint.
+func (d *Database) SaveFactionVotes(results []VoteStageResults) error {
+	query := `INSERT INTO vote_stage_results (for_count, against_count, abstained_count, no_vote_count, faction_id, vote_stage_id)
+              VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT(faction_id, vote_stage_id) DO UPDATE SET
+                for_count       = excluded.for_count,
+                against_count   = excluded.against_count,
+                abstained_count = excluded.abstained_count,
+                no_vote_count   = excluded.no_vote_count`
+
+	for _, result := range results {
+		_, err := d.db.Exec(query, result.ForCount, result.AgainstCount, result.AbstainedCount, result.NoVoteCount, result.FactionId)
+		if err != nil {
+			return fmt.Errorf("save faction vote: faction_id=%d: %w", result.FactionId, err)
+		}
+	}
+
+	return nil
+}

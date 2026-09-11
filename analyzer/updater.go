@@ -212,17 +212,78 @@ func (u *Updater) UpdateDrafts() error {
 				return fmt.Errorf("can not get last law voting. Err = %w", err)
 			}
 			lastVotingId := lastVoting.Id
-			_, err = u.fetcher.fetchVotingInfo(lastVotingId)
+			lastVotingInfo, err := u.fetcher.fetchVotingInfo(lastVotingId)
 			if err != nil {
 				return fmt.Errorf("can not fetch voting info. Err = %w", err)
 			}
-			// factionVotes := parseFactionVotes(lastVotingInfo.ResultsByFaction)
-			// u.db.SaveFactionVotes(factionVotes)
+			factionVotes, err := u.parseFactionVoteResults(lastVotingInfo.ResultsByFaction, int64(lastVotingId))
+			if err != nil {
+				return fmt.Errorf("cannot parse faction votes: %w", err)
+			}
+
+			if err := u.db.SaveFactionVotes(factionVotes); err != nil {
+				return fmt.Errorf("cannot save faction votes: %w", err)
+			}
 		}
 
 	}
 
 	return nil
+}
+
+func (u *Updater) parseFactionVoteResults(factionVotes []VoteFactionResult, voteStageId int64) ([]db.VoteStageResults, error) {
+	voteStageResults := []db.VoteStageResults{}
+	for _, factionVote := range factionVotes {
+		voteStageResult, err := u.parseFactionVoteResult(factionVote, voteStageId)
+		if err != nil {
+			u.logger.Error("Can not parse faction votes", "Err", err)
+			return []db.VoteStageResults{}, err
+		}
+
+		voteStageResults = append(voteStageResults, voteStageResult)
+	}
+
+	return voteStageResults, nil
+}
+
+func (u *Updater) parseFactionVoteResult(factionVote VoteFactionResult, voteStageId int64) (db.VoteStageResults, error) {
+	var err error
+
+	atoi := func(str string) int64 {
+		value, localErr := strconv.Atoi(str)
+		if localErr != nil && err == nil {
+			err = localErr
+		}
+
+		return int64(value)
+	}
+
+	forCount := atoi(factionVote.For)
+	againstCount := atoi(factionVote.Against)
+	abstainedCount := atoi(factionVote.Abstain)
+	noVoteCount := atoi(factionVote.Absent)
+
+	if err != nil {
+		return db.VoteStageResults{}, fmt.Errorf("can not parse vote info. err = %w", err)
+	}
+
+	factionCode, err := strconv.ParseInt(factionVote.Code, 10, 64)
+	if err != nil {
+		return db.VoteStageResults{}, fmt.Errorf("cannot parse faction code %q: %w", factionVote.Code, err)
+	}
+
+	faction, err := u.db.GetFactionByCode(factionCode)
+	if err != nil {
+		return db.VoteStageResults{}, fmt.Errorf("can not find faction for vote info. err = %w", err)
+	}
+
+	return db.VoteStageResults{
+		ForCount:       forCount,
+		AgainstCount:   againstCount,
+		AbstainedCount: abstainedCount,
+		NoVoteCount:    noVoteCount,
+		FactionId:      faction.Id,
+	}, nil
 }
 
 func parseLawDraft(votings []Vote) []db.LawDraft {
